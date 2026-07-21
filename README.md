@@ -47,11 +47,19 @@ make build-linux
 ./bin/moistchat
 ```
 
-> **Distributing a Linux build?** Use `make build-linux`. It statically links
-> libopus so the binary has no `libopus.so` runtime dependency. The only
-> remaining dynamic dependencies are glibc and ALSA/PulseAudio (which are
-> present on virtually every Linux desktop). Verify with
-> `ldd bin/moistchat | grep opus` — it should print nothing.
+> **Distributing a Linux build?** Two options depending on your build machine:
+>
+> 1. **`make build-linux`** — Statically links libopus. The binary has no
+>    `libopus.so` runtime dependency. The remaining dynamic deps are glibc and
+>    ALSA/PulseAudio (present on every Linux desktop). Recipient needs nothing
+>    extra. **Requires `libopus.a` on the build machine.**
+>    Verify with `ldd bin/moistchat | grep opus` — should print nothing.
+>
+> 2. **`make build`** — Auto-detects `libopus.a`; if missing, links dynamically.
+>    If dynamically linked, `ldd bin/moistchat | grep opus` shows
+>    `libopus.so.0`. Recipient must install `opus` (`pacman -S opus`,
+>    `apt install libopus0`, `dnf install opus-libs`) — a tiny, standard
+>    package on every distro.
 
 #### macOS
 
@@ -303,8 +311,10 @@ Tailscale state: ephemeral per session (cleaned up on exit).
 | **Binary** | `bin/moistchat` |
 
 Self-contained static binary (no runtime libopus dependency) when built with
-`make build-linux` or when `libopus.a` is present. Verify with
-`ldd bin/moistchat | grep opus` — should print nothing.
+`make build-linux` or when `libopus.a` is present. Falls back to dynamic
+linking (`libopus.so.0`) when static library is unavailable — recipient
+needs the `opus` package installed to run.
+Verify static build: `ldd bin/moistchat | grep opus` — should print nothing.
 
 ### macOS
 
