@@ -52,7 +52,7 @@ make build
 # Install Xcode Command Line Tools (required for audio + camera):
 xcode-select --install
 
-# Install Opus codec:
+# Install Opus codec + pkg-config (build-time dependency):
 brew install opus pkg-config
 
 # Dev mode (no network, UI only):
@@ -61,10 +61,26 @@ make dev
 # Run with auth key:
 TAILSCALE_AUTH_KEY=tskey-auth-xxxxx make run
 
-# Build binary:
+# Build binary (dynamically linked — needs `brew install opus` present to run):
 make build
 ./bin/moistchat
+
+# Self-contained build (libopus statically linked — no runtime dependency):
+make build-macos
+./bin/moistchat
 ```
+
+> **Distributing a macOS build?** Use `make build-macos`. It statically links
+> libopus so the binary runs on any Mac of the **same architecture** with
+> nothing installed (no Homebrew, no `brew install opus`). Confirm it is
+> self-contained with `otool -L bin/moistchat | grep -i opus` — it should print
+> nothing. Two caveats for the recipient:
+>
+> - **Architecture-specific.** An `arm64` (Apple Silicon) binary will not run on
+>   an Intel Mac and vice-versa. Build on / for the target's architecture.
+> - **Unsigned.** macOS Gatekeeper will block it on first launch. The recipient
+>   can allow it with `xattr -d com.apple.quarantine moistchat` (or right-click →
+>   Open). Signing/notarization requires an Apple Developer ID.
 
 #### Windows
 
