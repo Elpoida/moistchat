@@ -7,12 +7,50 @@ GOFLAGS := -ldflags "-X moistchat/internal/network.AuthKey=$(TAILSCALE_AUTH_KEY)
 # link dependency on every platform (only libopus is needed).
 TAGS := nolibopusfile
 
-.PHONY: all build build-macos run dev lobby lobby-run clean clean-state cross-compile
+.PHONY: all build build-linux build-macos run dev lobby lobby-run clean clean-state cross-compile
 
 all: build
 
+# Auto-detect static libopus.a and link it when available.
+# On Linux, installing libopus-dev (Debian), opus-devel (Fedora), or
+# opus (Arch+AUR) provides the static library — producing a binary with
+# NO runtime libopus dependency.
+# On macOS, use `make build-macos` instead.
+# Falls back to dynamic linking if libopus.a is not found.
 build:
-	$(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME) ./cmd/$(APP_NAME)
+	@libdir="$$(pkg-config --variable=libdir opus 2>/dev/null)"; \
+	 if [ -n "$$libdir" ] && [ -f "$$libdir/libopus.a" ]; then \
+	   pcdir="$$(mktemp -d)"; \
+	   printf 'Name: opus\nDescription: opus (static)\nVersion: %s\nCflags: %s\nLibs: %s/libopus.a\n' \
+	     "$$(pkg-config --modversion opus)" "$$(pkg-config --cflags opus)" "$$libdir" > "$$pcdir/opus.pc"; \
+	   echo "Building self-contained binary (static libopus)"; \
+	   CGO_ENABLED=1 PKG_CONFIG_PATH="$$pcdir:$$PKG_CONFIG_PATH" \
+	     $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME) ./cmd/$(APP_NAME); \
+	   rc=$$?; rm -rf "$$pcdir"; exit $$rc; \
+	 fi; \
+	 echo "No static libopus.a found — building with dynamic linking"; \
+	 $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME) ./cmd/$(APP_NAME)
+
+# Explicit static build for Linux. Fails if libopus.a is not installed.
+build-linux:
+	@libdir="$$(pkg-config --variable=libdir opus 2>/dev/null)"; \
+	 if [ -z "$$libdir" ] || [ ! -f "$$libdir/libopus.a" ]; then \
+	   echo "error: static libopus.a not found"; \
+	   echo "Install libopus-dev (Debian/Ubuntu), opus-devel (Fedora), or opus (Arch+AUR)."; \
+	   exit 1; \
+	 fi; \
+	 pcdir="$$(mktemp -d)"; \
+	 printf 'Name: opus\nDescription: opus (static)\nVersion: %s\nCflags: %s\nLibs: %s/libopus.a\n' \
+	   "$$(pkg-config --modversion opus)" "$$(pkg-config --cflags opus)" "$$libdir" > "$$pcdir/opus.pc"; \
+	 echo "Building self-contained Linux binary (static libopus)..."; \
+	 CGO_ENABLED=1 PKG_CONFIG_PATH="$$pcdir" \
+	   $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME) ./cmd/$(APP_NAME); \
+	 rc=$$?; rm -rf "$$pcdir"; \
+	 if [ $$rc -eq 0 ]; then \
+	   echo "built bin/$(APP_NAME)"; \
+	   echo "verify self-contained:  ldd bin/$(APP_NAME) | grep opus   (should print nothing)"; \
+	 fi; \
+	 exit $$rc
 
 # Self-contained macOS build: libopus is statically linked, so the resulting
 # binary has NO Homebrew/dylib dependency and runs on any Mac of the same
@@ -62,7 +100,7 @@ clean-state:
 	@echo "Cleared tsnet state directory ($(HOME)/.config/tsnet-moistchat)"
 
 cross-compile:
-	GOOS=linux GOARCH=amd64   $(GO) build $(GOFLAGS) -o bin/$(APP_NAME)-linux-amd64   ./cmd/$(APP_NAME)
-	GOOS=darwin GOARCH=amd64  $(GO) build $(GOFLAGS) -o bin/$(APP_NAME)-darwin-amd64  ./cmd/$(APP_NAME)
-	GOOS=darwin GOARCH=arm64  $(GO) build $(GOFLAGS) -o bin/$(APP_NAME)-darwin-arm64  ./cmd/$(APP_NAME)
-	GOOS=windows GOARCH=amd64 $(GO) build $(GOFLAGS) -o bin/$(APP_NAME)-windows-amd64.exe ./cmd/$(APP_NAME)
+	GOOS=linux GOARCH=amd64   $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME)-linux-amd64   ./cmd/$(APP_NAME)
+	GOOS=darwin GOARCH=amd64  $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME)-darwin-amd64  ./cmd/$(APP_NAME)
+	GOOS=darwin GOARCH=arm64  $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME)-darwin-arm64  ./cmd/$(APP_NAME)
+	GOOS=windows GOARCH=amd64 $(GO) build -tags "$(TAGS)" $(GOFLAGS) -o bin/$(APP_NAME)-windows-amd64.exe ./cmd/$(APP_NAME)

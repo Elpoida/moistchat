@@ -38,10 +38,20 @@ make dev
 # Run with auth key:
 TAILSCALE_AUTH_KEY=tskey-auth-xxxxx make run
 
-# Build binary:
+# Build binary (auto-detects static libopus.a if available):
 make build
 ./bin/moistchat
+
+# Self-contained build (explicit, fails if static library is missing):
+make build-linux
+./bin/moistchat
 ```
+
+> **Distributing a Linux build?** Use `make build-linux`. It statically links
+> libopus so the binary has no `libopus.so` runtime dependency. The only
+> remaining dynamic dependencies are glibc and ALSA/PulseAudio (which are
+> present on virtually every Linux desktop). Verify with
+> `ldd bin/moistchat | grep opus` — it should print nothing.
 
 #### macOS
 
@@ -70,6 +80,8 @@ make build-macos
 ./bin/moistchat
 ```
 
+> **macOS builds were contributed by [James Hole](https://github.com/jameshole).**
+>
 > **Distributing a macOS build?** Use `make build-macos`. It statically links
 > libopus so the binary runs on any Mac of the **same architecture** with
 > nothing installed (no Homebrew, no `brew install opus`). Confirm it is
@@ -80,7 +92,7 @@ make build-macos
 >   an Intel Mac and vice-versa. Build on / for the target's architecture.
 > - **Unsigned.** macOS Gatekeeper will block it on first launch. The recipient
 >   can allow it with `xattr -d com.apple.quarantine moistchat` (or right-click →
->   Open). Signing/notarization requires an Apple Developer ID.
+>   Open). Signing/notarization requires an Apple Developer ID. And fucked if I'm going to pay $99 so you guys can not get a popup
 
 #### Windows
 
@@ -284,12 +296,15 @@ Tailscale state: ephemeral per session (cleaned up on exit).
 
 | Component | Details |
 |-----------|---------|
-| **Build** | `make build` or `GOOS=linux GOARCH=amd64 make build` |
+| **Build** | `make build` (auto-detects static libopus) or `make build-linux` (explicit static) |
 | **Audio** | ALSA/PulseAudio via malgo (CGO). Requires `libopus-dev` and `pkg-config`. |
 | **Camera** | V4L2 via pion/mediadevices |
+| **Opus** | Auto-detects `libopus.a`. Falls back to `-lopus` (dynamic) if not found. |
 | **Binary** | `bin/moistchat` |
 
-Full static binary (no runtime dependencies beyond glibc).
+Self-contained static binary (no runtime libopus dependency) when built with
+`make build-linux` or when `libopus.a` is present. Verify with
+`ldd bin/moistchat | grep opus` — should print nothing.
 
 ### macOS
 
@@ -343,3 +358,9 @@ Generates binaries for all platforms in `bin/`:
 **"No auth key" on startup** — Set one with `/auth` and restart, or pass `TAILSCALE_AUTH_KEY` as an environment variable.
 
 **Clean slate** — `make clean-state` removes Tailscale state. Delete `~/.config/moistchat/config.json` to reset your config.
+
+---
+
+## Credits
+
+- [**James Hole**](https://github.com/jameshole) — macOS build fixes: enabled Opus CGO on `darwin`, added `build-macos` static-linking target, added `nolibopusfile` build tag, and fixed `cross-compile` targets. The resulting macOS binary has zero Homebrew runtime dependencies.
