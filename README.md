@@ -61,7 +61,35 @@ make build-linux
 >    `apt install libopus0`, `dnf install opus-libs`) — a tiny, standard
 >    package on every distro.
 
-#### macOS
+#### macOS (pre-built binary)
+
+If you downloaded a **release binary** (`moistchat-darwin-arm64` or `moistchat-darwin-amd64`), no extra setup is needed — just run it:
+
+```bash
+# Allow Gatekeeper (first launch only):
+xattr -d com.apple.quarantine ./moistchat
+
+# Run with auth key:
+TAILSCALE_AUTH_KEY=tskey-auth-xxxxx ./moistchat
+
+# Or bake the key in and run:
+chmod +x ./moistchat
+./moistchat
+```
+
+The release binary has Opus statically linked and uses only macOS system
+frameworks (CoreAudio, AVFoundation) — no Homebrew, no dylibs, nothing extra.
+
+> **Caveats:**
+> - **Architecture-specific.** An `arm64` (Apple Silicon) binary won't run on
+>   an Intel Mac and vice versa.
+> - **Unsigned.** macOS Gatekeeper blocks it on first launch. Allow it with
+>   `xattr -d com.apple.quarantine ./moistchat` (or right-click → Open).
+> - **Camera/mic permissions** are requested on first use of `/video` or `/call`.
+
+#### macOS (build from source)
+
+These instructions are only needed if you plan to **build** moistchat yourself:
 
 ```bash
 # Install Go: https://go.dev/dl/go1.26.4.darwin-arm64.pkg (Apple Silicon)
@@ -70,7 +98,7 @@ make build-linux
 # Install Xcode Command Line Tools (required for audio + camera):
 xcode-select --install
 
-# Install Opus codec + pkg-config (build-time dependency):
+# Install Opus codec + pkg-config (build-time dependency only):
 brew install opus pkg-config
 
 # Dev mode (no network, UI only):
@@ -88,19 +116,11 @@ make build-macos
 ./bin/moistchat
 ```
 
+`make build-macos` statically links libopus so the resulting binary runs on any
+Mac of the same architecture with nothing installed. Verify with
+`otool -L bin/moistchat | grep -i opus` — should print nothing.
+
 > **macOS builds were contributed by [James Hole](https://github.com/jameshole).**
->
-> **Distributing a macOS build?** Use `make build-macos`. It statically links
-> libopus so the binary runs on any Mac of the **same architecture** with
-> nothing installed (no Homebrew, no `brew install opus`). Confirm it is
-> self-contained with `otool -L bin/moistchat | grep -i opus` — it should print
-> nothing. Two caveats for the recipient:
->
-> - **Architecture-specific.** An `arm64` (Apple Silicon) binary will not run on
->   an Intel Mac and vice-versa. Build on / for the target's architecture.
-> - **Unsigned.** macOS Gatekeeper will block it on first launch. The recipient
->   can allow it with `xattr -d com.apple.quarantine moistchat` (or right-click →
->   Open). Signing/notarization requires an Apple Developer ID. And fucked if I'm going to pay $99 so you guys can not get a popup
 
 #### Windows
 
@@ -318,12 +338,15 @@ Verify static build: `ldd bin/moistchat | grep opus` — should print nothing.
 
 ### macOS
 
+> **Pre-built release binaries have no runtime dependencies — just download and run.**
+
 | Component | Details |
 |-----------|---------|
-| **Build** | `make build` (requires Xcode CLT + Homebrew) |
-| **Audio** | CoreAudio via malgo (CGO). Requires Xcode command line tools. |
-| **Camera** | AVFoundation via pion/mediadevices (CGO). Requires Xcode command line tools. |
-| **Opus** | `brew install opus pkg-config` |
+| **Build** | `make build` (requires Xcode CLT + Homebrew) or `make build-macos` (static) |
+| **Build deps** | Xcode CLT (`xcode-select --install`), Homebrew (`brew install opus pkg-config`) |
+| **Runtime deps** | None. Opus is statically linked in `make build-macos`. CoreAudio and AVFoundation are macOS system frameworks. |
+| **Audio** | CoreAudio via malgo (CGO). |
+| **Camera** | AVFoundation via pion/mediadevices (CGO). |
 | **Binary** | `bin/moistchat` |
 
 Supports both Apple Silicon (`darwin-arm64`) and Intel (`darwin-amd64`).
