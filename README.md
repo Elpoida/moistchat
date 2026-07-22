@@ -69,12 +69,6 @@ If you downloaded a **release binary** (`moistchat-darwin-arm64` or `moistchat-d
 # Allow Gatekeeper (first launch only):
 xattr -d com.apple.quarantine ./moistchat
 
-# Run with auth key:
-TAILSCALE_AUTH_KEY=tskey-auth-xxxxx ./moistchat
-
-# Or bake the key in and run:
-chmod +x ./moistchat
-./moistchat
 ```
 
 The release binary has Opus statically linked and uses only macOS system
