@@ -694,3 +694,24 @@ On Windows, build natively with MSYS2/MinGW for full audio via WASAPI/malgo.
 
 - Confirm all persistent local configuration permissions (0600) map properly across cross-platform directory targets.
 - Verify Lip Gloss styles and color profiles degrade gracefully across distinct terminal environments.
+
+## Future — P2P File Transfer
+
+Add peer-to-peer file transfer over the existing TCP relay using a `file_transfer` wire message type. No SFTP/SSH needed — reuse the same relay connections already carrying chat, audio, and video.
+
+### Wire Message
+
+```json
+{"type":"file_transfer","from":"alice","content":"<base64 chunks>","metadata":{"name":"cat.png","size":12345,"chunks":3,"index":0}}
+```
+
+Chunked transfer over the existing connection. The receiver reassembles chunks and writes to a configurable download directory.
+
+### Design Decisions Needed
+
+- `/send <path>` command to initiate a transfer
+- Files appear in chat as "[alice sent: cat.png (1.2 MB)]"
+- Progress shown in the status/input area
+- Receive directory: `~/Downloads/moistchat/` by default, configurable
+- Size limits / concurrent transfer handling
+- Video broadcast pauses during active transfer (or multiplex)
